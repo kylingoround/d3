@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<style>
+
+svg {
+  /*pink box for the whole svg*/
+  border: 1px solid #f0f;
+}
+
+.counties {
+  stroke: #d0d0d0;
+  fill:none;
+}
+
+.counties.has-guns {
+  fill.red;
+}
+
+.county-bubble {
+  fill: orange;
+}
+
+</style>
+
+<body>
+</body>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/topojson.v1.min.js"></script>
+
+<script>
+
+// preparation:
+//   - download GIS file
+//   - load it to mapeshaper.com
+//   - simplify map on the website or use simplify code
+//   - download
+//
+// 1.load data (map and dataset) use queue() and defer()
+// 2.prepare data: add count3
+// 3.generate map - projection and context
+// 4.color each state based on count3 value
+
+var margin = {top:20, right:10, bottom:20, left:10};
+
+var threshold = d3.scaleThreshold()
+    .domain([3,6,9,12,50])
+    .range(["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"]);
+
+var width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+
+    d3.queue()
+      .defer(d3.csv, "gun-history.csv")
+      .defer(d3.json, "us.json")
+      .await(ready);
+
+function ready(err, data, us) {
+  if (err) throw "error loading data";
+
+  gunsByFips = {};
+  data.forEach(function(d) {
+    gunsByFips[d.FIPS] = +d.count3;
+  })
+
+  var counties = topojson.feature(us, us.objects.counties);
+
+  var geoPathGenerator = d3.geoPath()
+      .projection(d3.geoAlbersUsa()
+        .fitSize([width, height], counties));
+
+  var countyPaths = svg.selectAll(".counties")
+      .data(counties.features)
+      .enter().append("path")
+      .attr("class", "counties")
+      .attr("d", function(d) {
+        return geoPathGenerator(d);
+      })
+      // .classed("has-guns", function(d) {
+      //   var guns = gunsByFips[d.id];
+      //   return guns > 10;
+      // })
+      .style("fill", function(d) {
+        var guns = gunsByFips[d.id];
+        return threshold(guns);
+      })
+
+  // var Centroids = d3.geoPath().centroid();
+  // var Centroids = geoPathGenerator.centroid()
+
+  // path.centroid.features()
+
+  console.log(counties.features);
+
+  svg.selectAll(".bubbles")
+    .data(counties.features)
+    .enter()
+    .append("circle")
+    .attr("class", "bubbles")
+    .attr("cx", function(d) {
+      // return Centroids(d);
+      // console.log(Centroids(d));
+      // console.log(d);
+      var guns = geoPathGenerator.centroid(d);
+      // return guns[0];
+      if(isNaN(guns[0])) {
+        console.log("isn't")
+      } else {
+        console.log("is a number")
+        return guns[0]
+      }
+
+      console.log(guns);
+    })
+    .attr("cy", function(d) {
+      // return Centroids(d);
+      var guns = geoPathGenerator.centroid(d);
+      // return guns[1];
+      if(isNaN(guns[1])) {
+        // console.log("isn't")
+      } else {
+        // console.log("is a number")
+        return guns[1]
+      }
+
+    })
+    .attr("r", function(d) {
+      var guns = gunsByFips[d.id]
+      if(isNaN(guns)) {
+        // console.log("isn't")
+      } else {
+        return Math.sqrt(guns) * 1.5;
+      }
+    })
+}
+
+
+//Question: what is gunsByFips[d.id]?
+</script>
